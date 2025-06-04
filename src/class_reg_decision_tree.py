@@ -51,17 +51,14 @@ def get_splits_categorical(col: pd.Series):
     n = len(unique_vals)
     if n <= 1:
         return
-
-    for i in range(1, n // 2 + 1):
-        for subset in combinations(unique_vals, i):
-            subset = set(subset)
-            left_mask = col.isin(subset)
-            yield {str(c) for c in subset}, left_mask, ~left_mask
+    
+    for val in unique_vals:
+        left_mask = col == val
+        yield str(val), left_mask, ~left_mask
 
 
 def gini_best_splits(X: pd.DataFrame, y: pd.Series):
     best_splits = [(None, None, -np.inf)]
-
     for col in X.columns:
         x_col = X[col]
         best_gain = -np.inf
@@ -86,30 +83,18 @@ def gini_best_splits(X: pd.DataFrame, y: pd.Series):
     return best_splits
 
 
-def should_stop(y, depth, best_gain, min_samples_split, max_depth):
-    if len(y) < min_samples_split:
-        return True
-    if gini_impurity(y) == 0:
-        return True
-    if best_gain <= 0:
-        return True
-    if depth >= max_depth:
-        return True
-    return False
-
-
 @dataclass
 class CartNode:
     left: CartNode | None
     right: CartNode | None
     split_column: str | None
-    condition: float | set[str] | None
+    condition: float | str | None
     probabilities: dict[str, float]
 
-    def split(self, X: pd.DataFrame) -> tuple[tuple[CartNode, pd.DataFrame], tuple[CartNode, pd.DataFrame]]:
+    def split(self, X: pd.DataFrame) -> tuple[tuple[CartNode, pd.Series], tuple[CartNode, pd.Series]]:
         match type(self.condition):
-            case builtins.set:
-                left_mask = X[self.split_column].isin(self.condition)
+            case builtins.str | builtins.int:
+                left_mask = X[self.split_column].astype(str) == self.condition
             case builtins.float:
                 left_mask = X[self.split_column] <= self.condition
             case _:
@@ -156,24 +141,66 @@ class Cart:
             else:
                 (left_node, left_mask), (right_node, right_mask) = node.split(X_temp)
                 nodes_to_visit.extend([
-                    (left_node, X[left_mask]),
-                    (right_node, X[right_mask])
+                    (left_node, X_temp[left_mask]),
+                    (right_node, X_temp[right_mask])
                 ])
         
         return predictions.sort_index()
 
-    def fit(self):
-        best_splits = gini_best_splits(self.X_train, self.y_train)
+    def fit(self, min_samples_split=5, max_depth=10):
 
-        chosen_split = best_splits[random.randint(0, len(best_splits)-1)]
+        def should_stop(y, best_gain, depth):
+            return (
+                len(y) < min_samples_split or
+                gini_impurity(y) == 0 or
+                best_gain <= 0 or
+                depth >= max_depth
+            )
         
-        self.root.split_column = chosen_split[0]
-        self.root.condition = chosen_split[1]
+        def expand_tree(node: CartNode, mask: pd.Series, depth: int):
+            X_temp = self.X_train[mask]
+            y_temp = self.y_train[mask]
 
-        (_, left_mask), (_, right_mask) = self.root.split(self.X_train)
-        left_y = self.y_train[left_mask]
-        self.root.left = CartNode(None, None, None, None, 
-                                  self.get_probs_as_dict(left_y))
-        right_y = self.y_train[right_mask]
-        self.root.right = CartNode(None, None, None, None, 
-                                   self.get_probs_as_dict(right_y))
+            best_splits = gini_best_splits(X_temp, y_temp)
+
+            if should_stop(y_temp, best_splits[0][2], depth):
+                return
+
+            chosen_split = best_splits[random.randint(0, len(best_splits)-1)]
+            
+            node.split_column = chosen_split[0]
+            node.condition = chosen_split[1]
+
+            (_, left_mask), (_, right_mask) = node.split(self.X_train)
+            left_mask = left_mask & mask
+            right_mask = right_mask & mask
+
+            left_y = self.y_train[left_mask]
+            node.left = CartNode(None, None, None, None, 
+                                    self.get_probs_as_dict(left_y))
+            expand_tree(node.left, left_mask, depth+1)
+
+            right_y = self.y_train[right_mask]
+            node.right = CartNode(None, None, None, None, 
+                                    self.get_probs_as_dict(right_y))
+            expand_tree(node.right, right_mask, depth+1)
+        
+        expand_tree(self.root, self.y_train==self.y_train, 0)
+
+    def print_tree(self):
+        def print_node(node: CartNode, prefix: str = "", is_left: bool = True):
+            connector = "├── " if is_left else "└── "
+            if node.split_column is None:
+                probs = ", ".join(f"{k}: {v:.2f}" for k, v in node.probabilities.items())
+                print(f"{prefix}{connector}Leaf: [{probs}]")
+            else:
+                if isinstance(node.condition, str):
+                    cond_str = f"is {node.condition}"
+                else:
+                    cond_str = f"<= {node.condition:.3f}"
+                print(f"{prefix}{connector}{node.split_column} {cond_str}")
+                child_prefix = prefix + ("│   " if is_left else "    ")
+                print_node(node.left, child_prefix, True)
+                print_node(node.right, child_prefix, False)
+
+        print_node(self.root, "", False)
