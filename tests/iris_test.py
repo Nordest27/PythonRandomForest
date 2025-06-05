@@ -4,7 +4,7 @@ import os
 
 sys.path.append(os.path.join(os.path.dirname(__file__), "..", "src"))
 
-from class_reg_decision_tree import Cart
+from class_reg_decision_tree import RandCart
 
 import pandas as pd
 
@@ -40,8 +40,7 @@ print(f'Accuracy: {accuracy * 100:.2f}%')
 conf_matrix = confusion_matrix(y_test, y_pred)
 print(conf_matrix)
 
-
-cart = Cart(X_train, y_train)
+cart = RandCart(X_train, y_train, use_progress_bar=True)
 
 cart.fit()
 y_probs = cart.predict(X_test)

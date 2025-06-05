@@ -12,15 +12,11 @@ import time
 
 from class_reg_decision_tree import RandCart
 
-from ucimlrepo import fetch_ucirepo 
-  
-student_performance = fetch_ucirepo(id=320) 
-  
-X = student_performance.data.features 
-y = student_performance.data.targets["G3"] > 10
+from sklearn.datasets import fetch_covtype
 
-print(X)
-print(y.value_counts())
+data = fetch_covtype(as_frame=True)
+X = data.data
+y = data.target  # Classes 1–7
 
 # Encode categorical features
 categorical_cols = X.select_dtypes(include=['object']).columns
@@ -41,7 +37,7 @@ X_enc_train, X_enc_test, y_train, y_test = train_test_split(
 # Example: Train a simple Decision Tree Classifier
 from sklearn.tree import DecisionTreeClassifier
 
-clf = DecisionTreeClassifier(criterion="gini", splitter="best", min_samples_split=6, random_state=42, max_depth=6)
+clf = DecisionTreeClassifier(criterion="gini", splitter="best", random_state=42, max_depth=6)
 ini_time = time.time()
 clf.fit(X_enc_train, y_train)
 end_time = time.time()
@@ -70,12 +66,10 @@ end_time = time.time()
 print("Train time:", end_time-ini_time)
 
 y_probs = cart.predict(X_test)
-print(y_probs)
-cart.print_tree()
+# cart.print_tree()
 
 y_pred = y_probs.idxmax(axis=1).astype(str)
 y_test = y_test.astype(str)
-print(y_pred)
 
 accuracy = accuracy_score(y_test, y_pred)
 print(f'Accuracy: {accuracy * 100:.2f}%')
