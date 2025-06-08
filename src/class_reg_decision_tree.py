@@ -1,12 +1,18 @@
 from __future__ import annotations
 import pandas as pd
 import numpy as np
-from itertools import combinations
 import builtins
 from dataclasses import dataclass
 import random
 from tqdm import tqdm
+import warnings
 
+warnings.filterwarnings(
+    "ignore",
+    category=FutureWarning,
+    # You can use a regex to match the specific warning message
+    message="The behavior of DataFrame concatenation with empty or all-NA entries is deprecated. *"
+)
 
 def gini_impurity(y: pd.Series) -> float:
     proportions = y.value_counts(normalize=True)
@@ -129,19 +135,20 @@ class CartNode:
 
 
 class RandCart:
-
     def __init__(
             self, 
             X_train: pd.DataFrame, 
             y_train: pd.Series, 
             max_features_to_explore: int = 5,
             max_depth: int = 10,
+            min_samples_split: int = 5,
             use_progress_bar: bool = False
         ):
         self.X_train = X_train
         self.y_train = y_train
         self.max_features_to_explore = min(max_features_to_explore, len(X_train.columns)//2)
         self.max_depth = max_depth
+        self.min_samples_split = min_samples_split
         self.root = CartNode(None, None, None, None, self.get_probs_as_dict(y_train))
         self.use_progress_bar = use_progress_bar
 
@@ -180,14 +187,14 @@ class RandCart:
         
         return predictions.sort_index()
 
-    def fit(self, min_samples_split=5):
+    def fit(self):
         if self.use_progress_bar:
             max_nodes = 2 ** (self.max_depth + 1) - 1  # Conservative full tree estimate
             pbar = tqdm(total=max_nodes, desc="Training RandCart")
 
         def should_stop(y, best_gain, depth):
             return (
-                len(y) < min_samples_split or
+                len(y) < self.min_samples_split or
                 gini_impurity(y) == 0 or
                 best_gain <= 0 or
                 depth >= self.max_depth
@@ -225,7 +232,8 @@ class RandCart:
 
 
         expand_tree(self.root, self.y_train.index, 0)
-        pbar.close()
+        if self.use_progress_bar:
+            pbar.close()
 
     def print_tree(self):
         def print_node(node: CartNode, prefix: str = "", is_left: bool = True):
