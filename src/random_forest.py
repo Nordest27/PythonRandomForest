@@ -1,4 +1,3 @@
-import pandas as pd
 import numpy as np
 
 from class_reg_decision_tree import RandCart

@@ -1,7 +1,6 @@
 from sklearn.model_selection import train_test_split
 from sklearn.datasets import fetch_openml
 from sklearn.metrics import accuracy_score, confusion_matrix
-
 from random_forest import predict_rf, random_forest
 
 def get_accuracy(y_test, preds):
@@ -26,7 +25,7 @@ bootstrap_size = 1000
 min_samples_split = 5
 
 print("Generating the random forest...")
-tree_ls = random_forest(X_train, y_train, n_estimators, max_features, max_depth, bootstrap_size, min_samples_split, )
+tree_ls = random_forest(X_train, y_train, n_estimators, max_features, max_depth, bootstrap_size, min_samples_split)
 
 print("Predicting the testing set...")
 y_pred = predict_rf(tree_ls, X_test)
