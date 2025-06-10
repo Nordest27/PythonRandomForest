@@ -7,7 +7,6 @@ from tqdm import tqdm
 
 
 def gini_impurity(y: np.ndarray) -> float:
-    """Optimized gini using numpy arrays instead of pandas"""
     if len(y) == 0:
         return 0
     _, counts = np.unique(y, return_counts=True)
@@ -16,7 +15,6 @@ def gini_impurity(y: np.ndarray) -> float:
 
 
 def gini_gain(y: np.ndarray, left_mask: np.ndarray, right_mask: np.ndarray) -> float:
-    """Optimized gini gain using numpy arrays"""
     left_count = np.sum(left_mask)
     right_count = np.sum(right_mask)
 
@@ -33,8 +31,7 @@ def gini_gain(y: np.ndarray, left_mask: np.ndarray, right_mask: np.ndarray) -> f
     return gini_impurity(y) - weighted_impurity
 
 
-def get_splits_continuous(col: np.ndarray, num_splits: int = 5):
-    """Optimized continuous splits using numpy"""
+def get_splits_continuous(col: np.ndarray, num_splits: int = 20):
     unique_vals = np.unique(col[~np.isnan(col)])  # Remove NaNs first
 
     if len(unique_vals) <= 1:
@@ -51,8 +48,7 @@ def get_splits_continuous(col: np.ndarray, num_splits: int = 5):
         yield float(t), left_mask, ~left_mask
 
 
-def get_random_splits_categorical(col: np.ndarray, num_random: int = 5):
-    """Optimized categorical splits using numpy"""
+def get_random_splits_categorical(col: np.ndarray, num_random: int = 20):
     # Remove NaNs and get unique values
     mask = ~pd.isna(col)
     if not mask.any():
@@ -79,10 +75,10 @@ def get_random_splits_categorical(col: np.ndarray, num_random: int = 5):
 def gini_best_splits(
     X: np.ndarray,
     y: np.ndarray,
+    dtypes: dict,
     feature_names: list,
     features_to_explore: list | None = None,
 ):
-    """Optimized best splits using numpy arrays"""
     best_splits = [(None, None, -np.inf)]
 
     if features_to_explore is None:
@@ -99,8 +95,8 @@ def gini_best_splits(
         best_condition = None
 
         # Handle regular splits
-        if np.issubdtype(x_col.dtype, np.number):
-            splitter = get_splits_continuous(x_col)
+        if np.issubdtype(dtypes[feature_names[col_idx]], np.number):
+            splitter = get_splits_continuous(x_col.astype(float))
         else:
             splitter = get_random_splits_categorical(x_col)
 
@@ -142,7 +138,7 @@ class CartNode:
         if isinstance(self.condition, set):
             left_mask = np.isin(x_col, list(self.condition))
         elif isinstance(self.condition, float):
-            left_mask = x_col <= self.condition
+            left_mask = x_col.astype(float) <= self.condition
         elif isinstance(self.condition, str):
             left_mask = pd.isna(x_col)
         else:
@@ -166,7 +162,10 @@ class RandCart:
         self.y_train_np = y_train.values
         self.feature_names = list(X_train.columns)
         self.class_names = [str(c) for c in y_train.unique()]
-
+        self.dtypes = {
+            c: (dt if isinstance(dt, np.dtype) else np.dtypes.ObjectDType)
+            for c, dt in X_train.dtypes.to_dict().items()
+        }
         self.max_features_to_explore = min(
             max_features_to_explore, len(X_train.columns) // 2
         )
@@ -178,7 +177,6 @@ class RandCart:
         self.use_progress_bar = use_progress_bar
 
     def get_probs_as_dict(self, y: np.ndarray):
-        """Optimized probability calculation using numpy"""
         if len(y) == 0:
             return {name: 0.0 for name in self.class_names}
 
@@ -195,7 +193,6 @@ class RandCart:
         return prob_dict
 
     def predict(self, X: pd.DataFrame):
-        """Optimized prediction using numpy arrays"""
         assert (
             list(X.columns) == self.feature_names
         ), "Inference data does not have the same columns as train data"
@@ -232,10 +229,9 @@ class RandCart:
 
         return pd.DataFrame(predictions, columns=self.class_names, index=X.index)
 
-    def fit(self):
-        if self.use_progress_bar:
-            max_nodes = 2 ** (self.max_depth + 1) - 1
-            pbar = tqdm(total=max_nodes, desc="Training RandCart")
+    def fit(self, pbar=None):
+        if self.use_progress_bar and pbar is None:
+            pbar = tqdm(total=1.0, desc="Training RandCart")
 
         def should_stop(y, best_gain, depth):
             return (
@@ -259,17 +255,20 @@ class RandCart:
             random_features = [self.feature_names[i] for i in random_feature_indices]
 
             best_splits = gini_best_splits(
-                X_temp, y_temp, self.feature_names, random_features
+                X_temp, y_temp, self.dtypes, self.feature_names, random_features
             )
 
             if should_stop(y_temp, best_splits[0][2], depth):
-                if self.use_progress_bar:
-                    pbar.update(2 ** (self.max_depth + 1 - depth) - 1)
+                if pbar is not None:
+                    pbar.update(
+                        (2 ** (self.max_depth + 1 - depth) - 1)
+                        / (2 ** (self.max_depth + 1) - 1)
+                    )
                 return
 
             chosen_split = random.choice(best_splits)
-            if self.use_progress_bar:
-                pbar.update(1)
+            if pbar is not None:
+                pbar.update(1 / (2 ** (self.max_depth + 1) - 1))
 
             node.split_column = chosen_split[0]
             node.condition = chosen_split[1]

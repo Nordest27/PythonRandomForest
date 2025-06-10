@@ -1,4 +1,3 @@
-
 import sys
 import os
 
@@ -35,7 +34,7 @@ classifier.fit(np_X_train, y_train)
 y_pred = classifier.predict(np_X_test)
 
 accuracy = accuracy_score(y_test, y_pred)
-print(f'Accuracy: {accuracy * 100:.2f}%')
+print(f"Accuracy: {accuracy * 100:.2f}%")
 
 conf_matrix = confusion_matrix(y_test, y_pred)
 print(conf_matrix)
@@ -52,7 +51,7 @@ y_test = y_test.astype(str)
 print(y_pred)
 
 accuracy = accuracy_score(y_test, y_pred)
-print(f'Accuracy: {accuracy * 100:.2f}%')
+print(f"Accuracy: {accuracy * 100:.2f}%")
 
 conf_matrix = confusion_matrix(y_test, y_pred)
 print(conf_matrix)
