@@ -1,4 +1,3 @@
-
 import sys
 import os
 
@@ -12,18 +11,18 @@ import time
 
 from class_reg_decision_tree import RandCart
 
-from ucimlrepo import fetch_ucirepo 
-  
-student_performance = fetch_ucirepo(id=320) 
-  
-X = student_performance.data.features 
+from ucimlrepo import fetch_ucirepo
+
+student_performance = fetch_ucirepo(id=320)
+
+X = student_performance.data.features
 y = student_performance.data.targets["G3"] > 10
 
 print(X)
 print(y.value_counts())
 
 # Encode categorical features
-categorical_cols = X.select_dtypes(include=['object']).columns
+categorical_cols = X.select_dtypes(include=["object"]).columns
 X_encoded = X.copy()
 label_encoders = {}
 
@@ -41,19 +40,21 @@ X_enc_train, X_enc_test, y_train, y_test = train_test_split(
 # Example: Train a simple Decision Tree Classifier
 from sklearn.tree import DecisionTreeClassifier
 
-clf = DecisionTreeClassifier(criterion="gini", splitter="best", min_samples_split=6, random_state=42, max_depth=6)
+clf = DecisionTreeClassifier(
+    criterion="gini", splitter="best", min_samples_split=6, random_state=42, max_depth=6
+)
 ini_time = time.time()
 clf.fit(X_enc_train, y_train)
 end_time = time.time()
-print("Train time:", end_time-ini_time)
+print("Train time:", end_time - ini_time)
 
 # Predict and evaluate
 y_pred = clf.predict(X_enc_test)
 accuracy = accuracy_score(y_test, y_pred)
 conf_matrix = confusion_matrix(y_test, y_pred)
 
-print(f'Accuracy: {accuracy * 100:.2f}%')
-print('Confusion Matrix:')
+print(f"Accuracy: {accuracy * 100:.2f}%")
+print("Confusion Matrix:")
 print(conf_matrix)
 
 
@@ -67,7 +68,7 @@ cart = RandCart(X_train, y_train, use_progress_bar=True)
 ini_time = time.time()
 cart.fit()
 end_time = time.time()
-print("Train time:", end_time-ini_time)
+print("Train time:", end_time - ini_time)
 
 y_probs = cart.predict(X_test)
 print(y_probs)
@@ -78,8 +79,7 @@ y_test = y_test.astype(str)
 print(y_pred)
 
 accuracy = accuracy_score(y_test, y_pred)
-print(f'Accuracy: {accuracy * 100:.2f}%')
+print(f"Accuracy: {accuracy * 100:.2f}%")
 
 conf_matrix = confusion_matrix(y_test, y_pred)
 print(conf_matrix)
-
