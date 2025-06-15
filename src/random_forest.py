@@ -7,6 +7,9 @@ class RandomForest:
 
     @staticmethod
     def draw_bootstrap(X_train, y_train, bootstrap_size, show=False):
+        """Draws a bootstrap sample of size bootstrap_size
+        from X_train and y_train
+        Returns both the bootstrap sample and the out -of -bag (OOB) sample"""
         bootstrap_indices = np.random.randint(len(X_train), size=bootstrap_size)
         oob_indices = np.array(
             [i for i in range(len(X_train)) if i not in bootstrap_indices]
@@ -41,6 +44,9 @@ class RandomForest:
         self.tree_ls = list()
 
     def oob_score(self, i, X_test, y_test):
+        """Computes the out -of -bag error for the i-th tree using
+        the provided test data (X_test , y_test)
+        Returns the misclassification rate"""
         mis_label = 0
         pred = self.tree_ls[i].predict(X_test)
         for i in range(len(X_test)):
@@ -49,6 +55,9 @@ class RandomForest:
         return mis_label / len(X_test)
 
     def predict(self, X_test):
+        """Predicts the class labels for the samples in X_test using
+        majority vote across all trained trees"""
+
         # One row per each entry in the X_test
         predictions = [[] for _ in range(len(X_test))]
         for tree in self.tree_ls:
@@ -67,6 +76,8 @@ class RandomForest:
         return np.array(preds)
 
     def fit(self, X_train: np.array, y_train: np.array, show: str | None = None):
+        """Trains the forest using n_estimators decision trees.
+        Each tree is trained on a bootstrap sample from the training data"""
         if show not in ["trees", "progress", None]:
             raise ValueError("Parameter 'show' can be 'trees', 'progress' or None")
         pbar = None
