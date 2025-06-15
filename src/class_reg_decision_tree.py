@@ -4,9 +4,17 @@ import numpy as np
 from dataclasses import dataclass
 import random
 from tqdm import tqdm
+import warnings
+
+# Ignore: tqdmWarning: clamping frac to range [0, 1]
+warnings.filterwarnings("ignore")
 
 
 def gini_impurity(y: np.ndarray) -> float:
+    """Computes the Gini impurity of the label vector y.
+    It measures the probability of misclassification by
+    randomly picking a label according to the distribution
+    of classes in y"""
     if len(y) == 0:
         return 0
     _, counts = np.unique(y, return_counts=True)
@@ -15,6 +23,9 @@ def gini_impurity(y: np.ndarray) -> float:
 
 
 def gini_gain(y: np.ndarray, left_mask: np.ndarray, right_mask: np.ndarray) -> float:
+    """Computes the Gini gain from splitting y into two parts ,
+    using left_mask and right_mask to define the split.
+    It represents the reduction in impurity after the split"""
     left_count = np.sum(left_mask)
     right_count = np.sum(right_mask)
 
@@ -32,6 +43,9 @@ def gini_gain(y: np.ndarray, left_mask: np.ndarray, right_mask: np.ndarray) -> f
 
 
 def get_splits_continuous(col: np.ndarray, num_splits: int = 20):
+    """Returns a list of num_splits threshold values to try
+    for splitting a continuous column. These are sampled
+    from the unique values in cola"""
     unique_vals = np.unique(col[~np.isnan(col)])  # Remove NaNs first
 
     if len(unique_vals) <= 1:
@@ -49,6 +63,9 @@ def get_splits_continuous(col: np.ndarray, num_splits: int = 20):
 
 
 def get_random_splits_categorical(col: np.ndarray, num_random: int = 20):
+    """Returns num_random randomly generated binary splits
+    of the values in a categorical column. Each split is
+    represented as a set of categories ."""
     # Remove NaNs and get unique values
     mask = ~pd.isna(col)
     if not mask.any():
@@ -79,6 +96,9 @@ def gini_best_splits(
     feature_names: list,
     features_to_explore: list | None = None,
 ):
+    """For a random subset of features (given by features_to_explore ),
+    calculates candidate splits and their gini gains.
+    Returns the best split found (feature , condition , gain )."""
     best_splits = [(None, None, -np.inf)]
 
     if features_to_explore is None:
@@ -132,7 +152,8 @@ class CartNode:
     probabilities: dict[str, float]
 
     def split(self, X: np.ndarray, col_idx: int) -> tuple[np.ndarray, np.ndarray]:
-        """Optimized split using numpy arrays"""
+        """Partitions input data X based on the Node ’s condition applied
+        to the column col_idx , which is gotten from the split_column field"""
         x_col = X[:, col_idx]
 
         if isinstance(self.condition, set):
@@ -177,6 +198,8 @@ class RandCart:
         self.use_progress_bar = use_progress_bar
 
     def get_probs_as_dict(self, y: np.ndarray):
+        """Gets the expected probabilities of each
+        category of y based on the data"""
         if len(y) == 0:
             return {name: 0.0 for name in self.class_names}
 
@@ -193,6 +216,7 @@ class RandCart:
         return prob_dict
 
     def predict(self, X: pd.DataFrame):
+        """Predict the category of each sample in X"""
         assert (
             list(X.columns) == self.feature_names
         ), "Inference data does not have the same columns as train data"
@@ -230,10 +254,15 @@ class RandCart:
         return pd.DataFrame(predictions, columns=self.class_names, index=X.index)
 
     def fit(self, pbar=None):
+        """Expand the tree fully using the data from
+        X_train and y_train"""
         if self.use_progress_bar and pbar is None:
             pbar = tqdm(total=1.0, desc="Training RandCart")
 
         def should_stop(y, best_gain, depth):
+            """Returns a boolean with the condition to stop expanding .
+            Stops if all labels are the same , gain is too low ,
+            or max depth has been reached ."""
             return (
                 len(y) < self.min_samples_split
                 or gini_impurity(y) == 0
@@ -242,6 +271,9 @@ class RandCart:
             )
 
         def expand_tree(node: CartNode, indices: np.ndarray, depth: int):
+            """Expand the node with the data described by indices ,
+            choose the best gini split using the randomized split search.
+            Don ’t expand if the conditions are met"""
             X_temp = self.X_train_np[indices]
             y_temp = self.y_train_np[indices]
 
