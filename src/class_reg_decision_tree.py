@@ -4,6 +4,10 @@ import numpy as np
 from dataclasses import dataclass
 import random
 from tqdm import tqdm
+import warnings
+
+# Ignore: tqdmWarning: clamping frac to range [0, 1]
+warnings.filterwarnings("ignore")
 
 
 def gini_impurity(y: np.ndarray) -> float:
